@@ -1,5 +1,6 @@
 
 #include "../include/mmu.h"
+#include "../include/hd.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -33,7 +34,7 @@ int encontrarBlocoNaCache(Cache *cache, int conjunto, int endBloco) {
     return -1;
 }
 
-BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2, Cache* L3) {
+BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2, Cache* L3, HD *hd) {
     int numConjuntosL1 = L1->numConjuntos;
     int numConjuntosL2 = L2->numConjuntos;
     int numConjuntosL3 = L3->numConjuntos;
@@ -77,21 +78,42 @@ BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2,
         }
     }
 
+    BlocoMemoria* bloco_ram = RAM_getDado(ram, e->endBloco);
+    if (bloco_ram->endBloco == e->endBloco) {
+        custo = 11110;
+        // Move para L3 e propagar
+        BlocoMemoria* bloco = MMU_movRamCache3(posicaoCache3, L3, ram, e, custo);
+        for (int i = 0; i < 2; i++) {
+            if (L3->memorySet[posicaoCache3].lines[i].endBloco == e->endBloco) {
+                MMU_movCache3Cache2(posicaoCache2, posicaoCache3, L2, L3, custo, i);
+                for (int j = 0; j < 2; j++) {
+                    if (L2->memorySet[posicaoCache2].lines[j].endBloco == e->endBloco) {
+                        MMU_movCache2Cache1(posicaoCache1, posicaoCache2, L1, L2, L3, custo, j);
+                    }
+                }
+            }
+        }
+        return bloco;
+    }
+
+
     // Se não encontrou em nenhuma cache, busca na RAM e move para a Cache L3
-    custo = 11110;
-    BlocoMemoria* bloco = MMU_movRamCache3(posicaoCache3, L3, ram, e, custo);
+    custo = 111110;
+    BlocoMemoria* bloco = MMU_movHDParaRAM(e->endBloco, ram, hd);
+    
+    // Agora move para L3
+    bloco = MMU_movRamCache3(posicaoCache3, L3, ram, e, custo);
+    
     for (int i = 0; i < 2; i++) {
         if (L3->memorySet[posicaoCache3].lines[i].endBloco == e->endBloco) {
-            MMU_movCache3Cache2(posicaoCache2, posicaoCache3, L2, L3, custo,i);
-            for (int i = 0; i < 2; i++) {
-                if (L2->memorySet[posicaoCache2].lines[i].endBloco == e->endBloco) {
-                    MMU_movCache2Cache1(posicaoCache1, posicaoCache2, L1, L2,L3, custo,i);
+            MMU_movCache3Cache2(posicaoCache2, posicaoCache3, L2, L3, custo, i);
+            for (int j = 0; j < 2; j++) {
+                if (L2->memorySet[posicaoCache2].lines[j].endBloco == e->endBloco) {
+                    MMU_movCache2Cache1(posicaoCache1, posicaoCache2, L1, L2, L3, custo, j);
                 }
             }
         }
     }
-    //MMU_movCache3Cache2(posicaoCache2, posicaoCache3, L2, L3, custo,0); // Move de L3 para L2
-    //MMU_movCache2Cache1(posicaoCache1, posicaoCache2, L1, L2, L3,  custo,0); // Move de L2 para L1
     return bloco;
 }
 
@@ -154,8 +176,10 @@ BlocoMemoria* MMU_movRamCache3(int posicaoCache3, Cache* L3, RAM* ram, Endereco 
     // Tenta encontrar posição livre na L3
     for (int i = 0; i < 2; i++) {
         if (L3->memorySet[posicaoCache3].lines[i].endBloco == -1) {
-            L3->memorySet[posicaoCache3].lines[i] = RAM_getDado(ram, e->endBloco);
+            BlocoMemoria* blocoRAM = RAM_getDado(ram, e->endBloco);
+            L3->memorySet[posicaoCache3].lines[i] = *blocoRAM;
             L3->memorySet[posicaoCache3].lines[i].cacheHit = 4;
+            L3->memorySet[posicaoCache3].lines[i].custo = custo;
             atualizarUltimoAcesso(L3, posicaoCache3, i);
             return &L3->memorySet[posicaoCache3].lines[i];
         }
@@ -170,11 +194,52 @@ BlocoMemoria* MMU_movRamCache3(int posicaoCache3, Cache* L3, RAM* ram, Endereco 
     }
 
     // Insere novo bloco da RAM na L3
-    L3->memorySet[posicaoCache3].lines[lruIndex] = RAM_getDado(ram, e->endBloco);
+    BlocoMemoria* novoBlocoRAM = RAM_getDado(ram, e->endBloco);
+    L3->memorySet[posicaoCache3].lines[lruIndex] = *novoBlocoRAM; // Atribuição por valor
     L3->memorySet[posicaoCache3].lines[lruIndex].cacheHit = 4;
+    L3->memorySet[posicaoCache3].lines[lruIndex].custo = custo;
     atualizarUltimoAcesso(L3, posicaoCache3, lruIndex);
 
     return &L3->memorySet[posicaoCache3].lines[lruIndex];
+}
+
+BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram, HD* hd) {
+    int ram_index = -1;
+
+    // Busca por espaço vazio ou substituição LRU
+    for (int i = 0; i < ram->tamanho; i++) {
+        if (ram->memoria[i].endBloco == -1) {
+            ram_index = i;
+            break;
+        }
+    }
+
+    if (ram_index == -1) {
+        // Substituição LRU
+        int menorAcesso = ram->memoria[0].ultimoAcesso;
+        ram_index = 0;
+        for (int i = 1; i < ram->tamanho; i++) {
+            if (ram->memoria[i].ultimoAcesso < menorAcesso) {
+                menorAcesso = ram->memoria[i].ultimoAcesso;
+                ram_index = i;
+            }
+        }
+
+        // Escreve o bloco substituído de volta no HD (se atualizado)
+        if (ram->memoria[ram_index].atualizado) {
+            FILE *file = fopen("HD.bin", "rb+");
+            fseek(file, ram->memoria[ram_index].endBloco * sizeof(BlocoMemoria), SEEK_SET);
+            fwrite(&ram->memoria[ram_index], sizeof(BlocoMemoria), 1, file);
+            fclose(file);
+        }
+    }
+
+    // Carrega o bloco do HD para a RAM
+    BlocoMemoria bloco = HD_getDado(hd, endBloco);
+    ram->memoria[ram_index] = bloco;
+    ram->memoria[ram_index].ultimoAcesso = contadorLRU++; // Atualiza LRU
+
+    return &ram->memoria[ram_index];
 }
 
 BlocoMemoria* MMU_movCache2ParaCache3(int posicaoCache3, int posicaoCache2, Cache* L3, Cache* L2, int custo) {

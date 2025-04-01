@@ -6,6 +6,7 @@
 #include "../include/cpu.h"
 #include "../include/instrucao.h"
 #include "../include/geradorInstrucoes.h"
+#include "../include/hd.h"
 
 void programaAleatorioRepeticoes(RAM* ram, CPU* cpu) {
     Instrucao* trecho1 = (Instrucao*)malloc(10001 * sizeof(Instrucao));

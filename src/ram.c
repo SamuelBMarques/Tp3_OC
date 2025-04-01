@@ -5,8 +5,11 @@
 
 void criarRAM_vazia(RAM* ram, int tamanho) {
     ram->memoria = (BlocoMemoria*)malloc(tamanho * sizeof(BlocoMemoria));
+    ram->tamanho = tamanho;
     for (int i = 0; i < tamanho; i++) {
-        ram->memoria[i].endBloco = i;
+        ram->memoria[i].endBloco = -1; // Bloco inválido
+        ram->memoria[i].valido = 0;     // Não válido
+        ram->memoria[i].atualizado = 0; // Não modificado
         for (int j = 0; j < 4; j++) {
             ram->memoria[i].palavras[j] = 0;
         }
@@ -28,8 +31,8 @@ void RAM_setDado(RAM* ram, int endereco, BlocoMemoria *conteudo) {
     ram->memoria[endereco] = *conteudo;
 }
 
-BlocoMemoria RAM_getDado(RAM* ram, int endereco) {
-    return ram->memoria[endereco];
+BlocoMemoria* RAM_getDado(RAM* ram, int endereco) {
+    return &ram->memoria[endereco];
 }
 
 void RAM_imprimir(RAM* ram) {
@@ -45,3 +48,4 @@ void imprimirUmBloco(BlocoMemoria bloco) {
         printf("%d,", bloco.palavras[i]);
     }
 }
+

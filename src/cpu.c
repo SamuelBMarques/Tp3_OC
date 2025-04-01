@@ -1,6 +1,7 @@
 #include "../include/cpu.h"
 #include "../include/mmu.h"
 #include "../include/ram.h"
+#include "../include/hd.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -53,7 +54,7 @@ Cache *CPU_iniciarCache(int linhasPorConjunto) {
 }
 
 
-void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, char*tipo, int allowed) {
+void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, char*tipo, int allowed, HD* hd) {
     cpu->L1 = CPU_iniciarCache(lengthL1);
     cpu->L2 = CPU_iniciarCache(lenghtL2);
     cpu->L3 = CPU_iniciarCache(lengthL3);

@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "cstdlib": "c",
+        "mmu.h": "c"
+    }
+}
