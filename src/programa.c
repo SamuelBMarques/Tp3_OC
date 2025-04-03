@@ -8,7 +8,7 @@
 #include "../include/geradorInstrucoes.h"
 #include "../include/hd.h"
 
-void programaAleatorioRepeticoes(RAM* ram, CPU* cpu) {
+void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
     Instrucao* trecho1 = (Instrucao*)malloc(10001 * sizeof(Instrucao));
     
     FILE* file = fopen("programa.txt", "r");
@@ -19,7 +19,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu) {
 
     char linha[256];
     int index = 0;
-    while (fgets(linha, sizeof(linha), file)) {
+    while (fgets(linha, sizeof(linha), file) && index < 10000) {
         Instrucao* umaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
         char* palavras[7];
         char* token = strtok(linha, ":");
@@ -55,12 +55,71 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu) {
     umaInstrucao->opcode = -1;
     trecho1[10000] = *umaInstrucao;
 
+    Instrucao* tratamentoINT = (Instrucao*)malloc(100 * sizeof(Instrucao));
+    FILE* fileINT = fopen("interrupcao.txt", "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    index = 0;
+    while (fgets(linha, sizeof(linha), fileINT)) {
+        Instrucao* umaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
+        char* palavras[7];
+        char* token = strtok(linha, ":");
+        int i = 0;
+        
+        while (token != NULL) {
+            palavras[i++] = token;
+            token = strtok(NULL, ":");
+        }
+
+        umaInstrucao->opcode = atoi(palavras[0]);
+
+        Endereco* e1 = (Endereco*)malloc(sizeof(Endereco));
+        e1->endBloco = atoi(palavras[1]);
+        e1->endPalavra = atoi(palavras[2]) % 4;
+        umaInstrucao->add1 = e1;
+
+        Endereco* e2 = (Endereco*)malloc(sizeof(Endereco));
+        e2->endBloco = atoi(palavras[3]);
+        e2->endPalavra = atoi(palavras[4]) % 4;
+        umaInstrucao->add2 = e2;
+
+        Endereco* e3 = (Endereco*)malloc(sizeof(Endereco));
+        e3->endBloco = atoi(palavras[5]);
+        e3->endPalavra = atoi(palavras[6]) % 4;
+        umaInstrucao->add3 = e3;
+
+        tratamentoINT[index++] = *umaInstrucao;
+    }
+    fclose(fileINT);
+
+    // Add halt instruction
+    Instrucao* ultimaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
+    ultimaInstrucao->opcode = -1;
+    tratamentoINT[100] = *ultimaInstrucao;
+
+
     criarRAM_aleatoria(ram, 1000);
+    CPU_setTratar(cpu,tratamentoINT);
     CPU_setPrograma(cpu, trecho1);
-    CPU_iniciar(cpu, ram, 16, 32, 64);
+    CPU_iniciar(cpu, ram, 16, 32, 64, pilhaContexto);
+    for (int i = 0; i <= 10000; i++) {
+        free(trecho1[i].add1);
+        free(trecho1[i].add2);
+        free(trecho1[i].add3);
+    }
+    free(trecho1);
+    
+    for (int i = 0; i <= 100; i++) {
+        free(tratamentoINT[i].add1);
+        free(tratamentoINT[i].add2);
+        free(tratamentoINT[i].add3);
+    }
+    free(tratamentoINT);
 }
 
-void programaAleatorio(RAM* ram, CPU* cpu, int qdeInstrucoes, int tamanhoRam) {
+void programaAleatorio(RAM* ram, CPU* cpu, int qdeInstrucoes, int tamanhoRam, Contexto** pilhaContexto) {
     Instrucao* trecho1 = (Instrucao*)malloc(qdeInstrucoes * sizeof(Instrucao));
     srand(time(NULL));
 
@@ -93,7 +152,7 @@ void programaAleatorio(RAM* ram, CPU* cpu, int qdeInstrucoes, int tamanhoRam) {
 
     criarRAM_vazia(ram, tamanhoRam);
     CPU_setPrograma(cpu, trecho1);
-    CPU_iniciar(cpu,ram, 16, 32, 64, "principal", 1);
+    CPU_iniciar(cpu,ram, 16, 32, 64,pilhaContexto);
 }
 
 int main() {
@@ -102,8 +161,11 @@ int main() {
     GeradorInstrucoesINT();
     RAM* ram = (RAM*)malloc(sizeof(RAM));
     CPU* cpu = (CPU*)malloc(sizeof(CPU));
-    CPU* tratar = (CPU*)malloc(sizeof(CPU));
+    criarHD();
+    Contexto* pilhaContexto = NULL;
     //programaAleatorio(ram, cpu, 1000, 100);
-    programaAleatorioRepeticoes(ram, cpu);
+    programaAleatorioRepeticoes(ram, cpu,&pilhaContexto);
+    free(ram);
+    free(cpu);
     return 0;
 }

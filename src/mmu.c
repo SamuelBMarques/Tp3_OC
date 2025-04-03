@@ -34,7 +34,7 @@ int encontrarBlocoNaCache(Cache *cache, int conjunto, int endBloco) {
     return -1;
 }
 
-BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2, Cache* L3, HD *hd) {
+BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2, Cache* L3) {
     int numConjuntosL1 = L1->numConjuntos;
     int numConjuntosL2 = L2->numConjuntos;
     int numConjuntosL3 = L3->numConjuntos;
@@ -99,7 +99,7 @@ BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2,
 
     // Se não encontrou em nenhuma cache, busca na RAM e move para a Cache L3
     custo = 111110;
-    BlocoMemoria* bloco = MMU_movHDParaRAM(e->endBloco, ram, hd);
+    BlocoMemoria* bloco = MMU_movHDParaRAM(e->endBloco, ram);
     
     // Agora move para L3
     bloco = MMU_movRamCache3(posicaoCache3, L3, ram, e, custo);
@@ -122,7 +122,7 @@ BlocoMemoria* MMU_movCache2Cache1(int posicaoCache1, int posicaoCache2, Cache* L
     // Encontra uma posição livre na Cache L1
     for (int i = 0; i < 2; i++) {
         if (!L1->memorySet[posicaoCache1].lines[i].valido) { // Verifica se a linha está vazia
-            L1->memorySet[posicaoCache1].lines[i] = L2->memorySet[posicaoCache2].lines[0];
+            L1->memorySet[posicaoCache1].lines[i] = L2->memorySet[posicaoCache2].lines[linhaFonte];
             L1->memorySet[posicaoCache1].lines[i].valido = 1; // Marca como válida
             L1->memorySet[posicaoCache1].lines[i].custo = custo;
             L1->memorySet[posicaoCache1].lines[i].cacheHit = 2;
@@ -203,7 +203,13 @@ BlocoMemoria* MMU_movRamCache3(int posicaoCache3, Cache* L3, RAM* ram, Endereco 
     return &L3->memorySet[posicaoCache3].lines[lruIndex];
 }
 
-BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram, HD* hd) {
+BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram) {
+    int buffer[4]; // Buffer para armazenar as 4 palavras do HD
+    if (!HD_getDado(endBloco, buffer)) { // Usar a nova HD_getDado
+        printf("Erro ao ler do HD!\n");
+        exit(EXIT_FAILURE);
+    }
+
     int ram_index = -1;
 
     // Busca por espaço vazio ou substituição LRU
@@ -227,17 +233,22 @@ BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram, HD* hd) {
 
         // Escreve o bloco substituído de volta no HD (se atualizado)
         if (ram->memoria[ram_index].atualizado) {
-            FILE *file = fopen("HD.bin", "rb+");
+            FILE *file = fopen("hd.bin", "rb+");
             fseek(file, ram->memoria[ram_index].endBloco * sizeof(BlocoMemoria), SEEK_SET);
             fwrite(&ram->memoria[ram_index], sizeof(BlocoMemoria), 1, file);
             fclose(file);
         }
     }
 
-    // Carrega o bloco do HD para a RAM
-    BlocoMemoria bloco = HD_getDado(hd, endBloco);
-    ram->memoria[ram_index] = bloco;
-    ram->memoria[ram_index].ultimoAcesso = contadorLRU++; // Atualiza LRU
+    // Carrega o bloco do HD para a RAMs
+    ram->memoria[ram_index].endBloco = endBloco; // Define o endBloco manualmente
+    ram->memoria[ram_index].valido = 1;
+    ram->memoria[ram_index].atualizado = 0;
+    ram->memoria[ram_index].cacheHit = 5;
+    ram->memoria[ram_index].ultimoAcesso = contadorLRU++;
+    for (int i = 0; i < 4; i++) {
+        ram->memoria[ram_index].palavras[i] = buffer[i]; // Copia as palavras
+    }
 
     return &ram->memoria[ram_index];
 }

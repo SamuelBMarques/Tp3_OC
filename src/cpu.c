@@ -5,8 +5,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void empilharContexto(int PC, Contexto **pilhaContexto) { // Alterado para ponteiro de ponteiro
+    Contexto* novo = (Contexto*)malloc(sizeof(Contexto));
+    novo->PC = PC;
+    novo->proximo = *pilhaContexto;
+    *pilhaContexto = novo;
+}
+
+int desempilharContexto(Contexto **pilhaContexto) { // Alterado para ponteiro de ponteiro
+    if (*pilhaContexto == NULL) return -1;
+    Contexto* topo = *pilhaContexto;
+    int PC = topo->PC;
+    *pilhaContexto = topo->proximo;
+    free(topo);
+    return PC;
+}
+
 void CPU_setPrograma(CPU* cpu, Instrucao* programaAux) {
     cpu->programa = programaAux;
+}
+
+void CPU_setTratar(CPU* cpu, Instrucao* interrupcao) {
+    cpu->tratar = interrupcao;
 }
 
 Cache *CPU_iniciarCache(int linhasPorConjunto) {
@@ -42,6 +62,7 @@ Cache *CPU_iniciarCache(int linhasPorConjunto) {
             umaCache->memorySet[i].lines[j] = (BlocoMemoria){ 
                 .palavras = {0, 0, 0, 0}, 
                 .endBloco = -1, 
+                .valido = 0, // Campo adicionado
                 .atualizado = 0, 
                 .custo = 0, 
                 .cacheHit = 0,
@@ -54,20 +75,31 @@ Cache *CPU_iniciarCache(int linhasPorConjunto) {
 }
 
 
-void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, char*tipo, int allowed, HD* hd) {
+void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3,Contexto **pilhaContexto) {
     cpu->L1 = CPU_iniciarCache(lengthL1);
     cpu->L2 = CPU_iniciarCache(lenghtL2);
     cpu->L3 = CPU_iniciarCache(lengthL3);
     cpu->opcode = 0;
     cpu->PC = 0;
-    cpu->aconteceuInterrupcao = 0; // Variável local para rastrear interrupções aninhadas
-    cpu->interrupcao = 0; // Variável local para rastrear interrupções aninhadas
+    int emInterrupcao = 0;
+    int allowed = 1;
 
-
-    cpu->missC1 = cpu->missC2 = cpu->missC3 = cpu->hitC1 = cpu->hitC2 = cpu->hitC3 = cpu->hitRAM = 0;
-    while (cpu->opcode != -1) {
-        Instrucao inst = cpu->interrupcao ? cpu->tratar[cpu->PC] : cpu->programa[cpu->PC];
+    cpu->missC1 = cpu->missC2 = cpu->missC3 = cpu->hitC1 = cpu->hitC2 = cpu->hitC3 = cpu->hitRAM = cpu->missRAM = cpu->hitHD = 0;
+    while (1) {
+        Instrucao inst;
+        
+        if(emInterrupcao){
+            inst = cpu->tratar[cpu->PC]; 
+        }else {
+            inst = cpu->programa[cpu->PC];
+        }
+        
         cpu->opcode = inst.opcode;
+
+        if (cpu->opcode == -1 && !emInterrupcao) {
+            printf("Programa principal terminou!\n");
+            break;
+        }
 
         if (cpu->opcode != -1) {
             cpu->registrador1 = MMU_buscarNasMemorias(inst.add1, ram, cpu->L1, cpu->L2, cpu->L3);
@@ -81,6 +113,7 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, ch
                 case 2: cpu->missC1++; cpu->hitC2++; break;
                 case 3: cpu->missC1++; cpu->missC2++; cpu->hitC3++; break;
                 case 4: cpu->missC1++; cpu->missC2++; cpu->missC3++; cpu->hitRAM++; break;
+                case 5: cpu->missC1++; cpu->missC2++; cpu->missC3++; cpu->missRAM++; cpu->hitHD++; break;
             }
 
             switch (cpu->registrador2->cacheHit) {
@@ -88,6 +121,7 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, ch
                 case 2: cpu->missC1++; cpu->hitC2++; break;
                 case 3: cpu->missC1++; cpu->missC2++; cpu->hitC3++; break;
                 case 4: cpu->missC1++; cpu->missC2++; cpu->missC3++; cpu->hitRAM++; break;
+                case 5: cpu->missC1++; cpu->missC2++; cpu->missC3++; cpu->missRAM++; cpu->hitHD++; break;
             }
 
             switch (cpu->registrador3->cacheHit) {
@@ -95,6 +129,7 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, ch
                 case 2: cpu->missC1++; cpu->hitC2++; break;
                 case 3: cpu->missC1++; cpu->missC2++; cpu->hitC3++; break;
                 case 4: cpu->missC1++; cpu->missC2++; cpu->missC3++; cpu->hitRAM++; break;
+                case 5: cpu->missC1++; cpu->missC2++; cpu->missC3++; cpu->missRAM++; cpu->hitHD++; break;
             }
 
             switch (cpu->opcode) {
@@ -106,44 +141,48 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, ch
                     cpu->registrador3->palavras[inst.add3->endPalavra] = cpu->registrador1->palavras[inst.add1->endPalavra] + cpu->registrador2->palavras[inst.add2->endPalavra];
                     cpu->registrador3->atualizado = 1;
                     cpu->custo += cpu->registrador1->custo + cpu->registrador2->custo + cpu->registrador3->custo;
-                    /*printf("Inst sum -> RAM posicao %d com conteudo na cache 1 %d\n", inst.add3->endBloco, cpu->registrador3->palavras[inst.add3->endPalavra]);
+                    printf("Inst sum -> RAM posicao %d com conteudo na cache 1 %d\n", inst.add3->endBloco, cpu->registrador3->palavras[inst.add3->endPalavra]);
                     printf("Custo ateh o momento.... %d\n", cpu->custo);
                     printf("Ateh o momento ... Hit C1: %d Miss C1: %d\n", cpu->hitC1, cpu->missC1);
                     printf("Ateh o momento ... Hit C2: %d Miss C2: %d\n", cpu->hitC2, cpu->missC2);
-                    printf("Ateh o momento ... Hit C3: %d Miss C3: %d\n", cpu->hitC3, cpu->missC3);*/
+                    printf("Ateh o momento ... Hit C3: %d Miss C3: %d\n", cpu->hitC3, cpu->missC3);
+                    printf("Ateh o momento ... Hit RAM: %d Miss RAM: %d\n", cpu->hitRAM, cpu->missRAM);
                     break;
                 case 1:
                     cpu->registrador3->palavras[inst.add3->endPalavra] = cpu->registrador1->palavras[inst.add1->endPalavra] - cpu->registrador2->palavras[inst.add2->endPalavra];
                     cpu->registrador3->atualizado = 1;
                     cpu->custo += cpu->registrador1->custo + cpu->registrador2->custo + cpu->registrador3->custo;
-                    /*printf("Inst sub -> RAM posicao %d com conteudo na cache 1 %d\n", inst.add3->endBloco, cpu->registrador3->palavras[inst.add3->endPalavra]);
+                    printf("Inst sub -> RAM posicao %d com conteudo na cache 1 %d\n", inst.add3->endBloco, cpu->registrador3->palavras[inst.add3->endPalavra]);
                     printf("Custo ateh o momento.... %d\n", cpu->custo);
                     printf("Ateh o momento ... Hit C1: %d Miss C1: %d\n", cpu->hitC1, cpu->missC1);
                     printf("Ateh o momento ... Hit C2: %d Miss C2: %d\n", cpu->hitC2, cpu->missC2);
-                    printf("Ateh o momento ... Hit C3: %d Miss C3: %d\n", cpu->hitC3, cpu->missC3);*/
+                    printf("Ateh o momento ... Hit C3: %d Miss C3: %d\n", cpu->hitC3, cpu->missC3);
+                    printf("Ateh o momento ... Hit RAM: %d Miss RAM: %d\n", cpu->hitRAM, cpu->missRAM);
                     break;
                 case 2:
-                    if(strcmp(tipo, "principal") == 0 || (strcmp(tipo, "TI") == 0 && allowed && !cpu->aconteceuInterrupcao)) {
-                        printf("\nEmpilhar interrupcao\n");
-                        cpu->interrupcao = 1;
+                    if (allowed && !emInterrupcao) {
+                        empilharContexto(cpu->PC, pilhaContexto); // Salva o PC atual
+                        emInterrupcao = 1; // Entra em modo de interrupção
+                        cpu->PC = 0; // Reinicia o PC para o início do tratador
+                        printf("\nINICIO - TRATADOR DE INTERRUPCAO\n");
+                        allowed = 0; // Bloqueia novas interrupções
                     }
                     break;
             }
-            if (cpu->interrupcao == 1) {
-                int newAllowed = (strcmp(tipo, "principal") == 0) ? 1 : 0;
-                printf("\nINICIO - TRATADOR DE INTERRUPCAO\n");
-                int aux = cpu->PC;
-                CPU_iniciar(cpu,ram, lengthL1, lenghtL2, lengthL3, "TI", newAllowed);
-                cpu->PC = aux;
-                printf("\nFIM - TRATADOR DE INTERRUPCAO\n\n");
-                cpu->interrupcao = 0;
-                cpu->aconteceuInterrupcao = 1; // Marca que uma interrupção já ocorreu nesta chamada
+
+            // Tratamento do fim da interrupção
+            if (emInterrupcao && cpu->opcode == -1) {
+                printf("\nFIM - TRATADOR DE INTERRUPCAO\n");
+                emInterrupcao = 0;
+                allowed = 1;
+                cpu->PC = desempilharContexto(pilhaContexto) + 1; // Restaura PC do programa principal
             }
+
+            cpu->PC++;
 
             cpu->registrador1->cacheHit = 0;
             cpu->registrador2->cacheHit = 0;
             cpu->registrador3->cacheHit = 0;
-            cpu->PC++;
         }
 
     }

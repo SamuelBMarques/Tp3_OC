@@ -4,6 +4,12 @@
 #include "blocoMemoria.h"
 #include "instrucao.h"
 #include "ram.h"
+#include "hd.h"
+
+typedef struct Contexto {
+    int PC;
+    struct Contexto* proximo;
+} Contexto;
 
 typedef struct {
     BlocoMemoria* registrador1;
@@ -21,17 +27,16 @@ typedef struct {
     int missC3;
     int hitC3;
     int hitRAM;
-    int missMEM;
-    int hitMEM;
+    int missRAM;
+    int hitHD;
     Cache* L1;
     Cache* L2;
     Cache* L3;
     int interrupcao;
-    int aconteceuInterrupcao;
 } CPU;
 
 void CPU_setPrograma(CPU* cpu, Instrucao* programaAux);
 Cache* CPU_iniciarCache(int tamanho);
-void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, char*tipo, int allowed);
-
+void CPU_setTratar(CPU* cpu, Instrucao* interrupcao);
+void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3, Contexto** pilhaContexto);
 #endif // CPU_H

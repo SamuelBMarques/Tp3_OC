@@ -1,50 +1,40 @@
 #include "../include/hd.h"
 #include <stdio.h>
 
+#define NUM_BLOCOS 10000
+#define PALAVRAS_POR_BLOCO 4
 
-void criaHD(HD *hd) {
-    hd->arquivo = fopen("HD.bin", "wb");
-    if (hd->arquivo == NULL) {
-        perror("Erro ao criar HD");
-        exit(EXIT_FAILURE);
+void criarHD() {
+    FILE *file = fopen("hd.bin", "wb");
+    if (!file) {
+        printf("Erro ao criar o HD!\n");
+        return;
     }
 
     srand(time(NULL));
-    BlocoMemoria bloco;
+    int linha[PALAVRAS_POR_BLOCO];
 
-    for (int i = 0; i < hd->capacidade; i++) {
-        // Preenche as palavras com valores aleatórios
-        for (int j = 0; j < 4; j++) {
-            bloco.palavras[j] = rand() % 100;
+    for (int i = 0; i < NUM_BLOCOS; i++) {
+        for (int j = 0; j < PALAVRAS_POR_BLOCO; j++) {
+            linha[j] = rand() % 100;  // Gera valores entre 0 e 99
         }
-        // Inicializa metadados
-        bloco.endBloco = i;
-        bloco.valido = 1;
-        bloco.atualizado = 0;
-        bloco.custo = 0;
-        bloco.cacheHit = 0;
-        bloco.ultimoAcesso = 0;
-
-        // Escreve o bloco completo no HD
-        fwrite(&bloco, sizeof(BlocoMemoria), 1, hd->arquivo);
+        fwrite(linha, sizeof(int), PALAVRAS_POR_BLOCO, file);
     }
 
-    fclose(hd->arquivo);
+    fclose(file);
 }
 
-
-BlocoMemoria HD_getDado(HD *hd, int endBloco) {
-    // Garante que o arquivo está aberto
-    if (hd->arquivo == NULL) {
-        hd->arquivo = fopen("HD.bin", "rb");
-        if (hd->arquivo == NULL) {
-            perror("Erro ao abrir HD");
-            exit(EXIT_FAILURE);
-        }
+int HD_getDado(int endBloco, int *buffer) {
+    FILE *file = fopen("hd.bin", "rb");
+    if (!file) {
+        printf("Erro ao abrir o HD!\n");
+        return 0;  // Retorna falha
     }
 
-    BlocoMemoria bloco;
-    fseek(hd->arquivo, endBloco * sizeof(BlocoMemoria), SEEK_SET);
-    fread(&bloco, sizeof(BlocoMemoria), 1, hd->arquivo);
-    return bloco;
+    // Cada bloco ocupa 4 inteiros no arquivo, então buscamos na posição correta
+    fseek(file, endBloco * 4 * sizeof(int), SEEK_SET);
+    fread(buffer, sizeof(int), 4, file);
+
+    fclose(file);
+    return 1;  // Retorna sucesso
 }
