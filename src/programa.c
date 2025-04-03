@@ -47,6 +47,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
         umaInstrucao->add3 = e3;
 
         trecho1[index++] = *umaInstrucao;
+        free(umaInstrucao);
     }
     fclose(file);
 
@@ -55,7 +56,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
     umaInstrucao->opcode = -1;
     trecho1[10000] = *umaInstrucao;
 
-    Instrucao* tratamentoINT = (Instrucao*)malloc(100 * sizeof(Instrucao));
+    Instrucao* tratamentoINT = (Instrucao*)malloc(101 * sizeof(Instrucao));
     FILE* fileINT = fopen("interrupcao.txt", "r");
     if (file == NULL) {
         perror("Error opening file");
@@ -91,6 +92,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
         umaInstrucao->add3 = e3;
 
         tratamentoINT[index++] = *umaInstrucao;
+        free(umaInstrucao);
     }
     fclose(fileINT);
 
@@ -100,7 +102,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
     tratamentoINT[100] = *ultimaInstrucao;
 
 
-    criarRAM_aleatoria(ram, 1000);
+    criarRAM_vazia(ram, 1000);
     CPU_setTratar(cpu,tratamentoINT);
     CPU_setPrograma(cpu, trecho1);
     CPU_iniciar(cpu, ram, 16, 32, 64, pilhaContexto);

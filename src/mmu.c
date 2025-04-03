@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 static int contadorLRU = 0; // Contador global para rastrear o último acesso
-static int lruIndex = 0;
 
 // Função para atualizar o tempo de acesso de um bloco
 void atualizarUltimoAcesso(Cache *cache, int conjunto, int linha) {
@@ -14,9 +13,10 @@ void atualizarUltimoAcesso(Cache *cache, int conjunto, int linha) {
 
 // Função para encontrar o conjunto usado a menos tempo
 int encontrarLRU(Cache *cache, int conjunto) {
+    int lruIndex = 0;
     int menorTempo = cache->memorySet[conjunto].lines[0].ultimoAcesso;
 
-    for (int i = 1; i < 2; i++) { // Como são 2 vias, percorremos apenas as 2 linhas
+    for (int i = 0; i < 2; i++) { // Como são 2 vias, percorremos apenas as 2 linhas
         if (cache->memorySet[conjunto].lines[i].ultimoAcesso < menorTempo) {
             menorTempo = cache->memorySet[conjunto].lines[i].ultimoAcesso;
             lruIndex = i;
@@ -118,6 +118,7 @@ BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2,
 }
 
 BlocoMemoria* MMU_movCache2Cache1(int posicaoCache1, int posicaoCache2, Cache* L1, Cache* L2, Cache* L3, int custo, int posicao) {
+    int lruIndex = 0;
     int linhaFonte = encontrarBlocoNaCache(L2, posicaoCache2, L2->memorySet[posicaoCache2].lines[posicao].endBloco);
     // Encontra uma posição livre na Cache L1
     for (int i = 0; i < 2; i++) {
@@ -138,6 +139,8 @@ BlocoMemoria* MMU_movCache2Cache1(int posicaoCache1, int posicaoCache2, Cache* L
         MMU_movCache1ParaCache2(posicaoCache2, posicaoCache1, L2, L1, custo, L3);
     }
     L1->memorySet[posicaoCache1].lines[lruIndex] = L2->memorySet[posicaoCache2].lines[linhaFonte];
+    L1->memorySet[posicaoCache1].lines[lruIndex].valido = 1; // Adicione
+    L1->memorySet[posicaoCache1].lines[lruIndex].atualizado = 0;
     L1->memorySet[posicaoCache1].lines[lruIndex].custo = custo;
     L1->memorySet[posicaoCache1].lines[lruIndex].cacheHit = 2; // Encontrado na L2
     atualizarUltimoAcesso(L1, posicaoCache1, lruIndex);
@@ -146,11 +149,12 @@ BlocoMemoria* MMU_movCache2Cache1(int posicaoCache1, int posicaoCache2, Cache* L
 }
 
 BlocoMemoria* MMU_movCache3Cache2(int posicaoCache2, int posicaoCache3, Cache* L2, Cache* L3, int custo, int posicao) {
+    int lruIndex = 0;
     int linhaFonte = encontrarBlocoNaCache(L3, posicaoCache3, L3->memorySet[posicaoCache3].lines[posicao].endBloco);
     // Encontra posição livre na Cache L2
     for (int i = 0; i < 2; i++) {
         if (L2->memorySet[posicaoCache2].lines[i].endBloco == -1) {
-            L2->memorySet[posicaoCache2].lines[i] = L3->memorySet[posicaoCache3].lines[0];
+            L2->memorySet[posicaoCache2].lines[i] = L3->memorySet[posicaoCache3].lines[linhaFonte];
             L2->memorySet[posicaoCache2].lines[i].custo = custo;
             L2->memorySet[posicaoCache2].lines[i].cacheHit = 3; // Encontrado na L3
             atualizarUltimoAcesso(L2, posicaoCache2, i);
@@ -166,6 +170,8 @@ BlocoMemoria* MMU_movCache3Cache2(int posicaoCache2, int posicaoCache3, Cache* L
     }
     L2->memorySet[posicaoCache2].lines[lruIndex] = L3->memorySet[posicaoCache3].lines[linhaFonte];
     L2->memorySet[posicaoCache2].lines[lruIndex].custo = custo;
+    L2->memorySet[posicaoCache2].lines[lruIndex].valido = 1; // Adicione
+    L2->memorySet[posicaoCache2].lines[lruIndex].atualizado = 0; 
     L2->memorySet[posicaoCache2].lines[lruIndex].cacheHit = 3; // Encontrado na L3
     atualizarUltimoAcesso(L2, posicaoCache2, lruIndex);
 
@@ -173,6 +179,7 @@ BlocoMemoria* MMU_movCache3Cache2(int posicaoCache2, int posicaoCache3, Cache* L
 }
 
 BlocoMemoria* MMU_movRamCache3(int posicaoCache3, Cache* L3, RAM* ram, Endereco *e, int custo) {
+    int lruIndex = 0;
     // Tenta encontrar posição livre na L3
     for (int i = 0; i < 2; i++) {
         if (L3->memorySet[posicaoCache3].lines[i].endBloco == -1) {
@@ -254,6 +261,7 @@ BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram) {
 }
 
 BlocoMemoria* MMU_movCache2ParaCache3(int posicaoCache3, int posicaoCache2, Cache* L3, Cache* L2, int custo) {
+    int lruIndex = 0;
     int linhaFonte = encontrarBlocoNaCache(L2, posicaoCache2, L2->memorySet[posicaoCache2].lines[0].endBloco);
     // Encontra posição livre na L3
     for (int i = 0; i < 2; i++) {
@@ -274,6 +282,7 @@ BlocoMemoria* MMU_movCache2ParaCache3(int posicaoCache3, int posicaoCache2, Cach
 }
 
 BlocoMemoria* MMU_movCache1ParaCache2(int posicaoCache2, int posicaoCache1, Cache* L2, Cache* L1, int custo, Cache* L3){
+    int lruIndex = 0;
     int linhaFonte = encontrarBlocoNaCache(L1, posicaoCache1, L1->memorySet[posicaoCache1].lines[0].endBloco);
     // Encontra posição livre na L2
     for (int i = 0; i < 2; i++) {

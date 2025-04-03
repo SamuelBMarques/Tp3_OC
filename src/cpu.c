@@ -81,13 +81,27 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3,Con
     cpu->L3 = CPU_iniciarCache(lengthL3);
     cpu->opcode = 0;
     cpu->PC = 0;
+    cpu->custo = 0;
     int emInterrupcao = 0;
     int allowed = 1;
 
     cpu->missC1 = cpu->missC2 = cpu->missC3 = cpu->hitC1 = cpu->hitC2 = cpu->hitC3 = cpu->hitRAM = cpu->missRAM = cpu->hitHD = 0;
     while (1) {
         Instrucao inst;
-        
+
+        if (cpu->opcode == -1 && !emInterrupcao) {
+            printf("Programa principal terminou!\n");
+            break;
+        }
+
+        // Tratamento do fim da interrupção
+        if (emInterrupcao && cpu->opcode == -1) {
+            printf("\nFIM - TRATADOR DE INTERRUPCAO\n");
+            emInterrupcao = 0;
+            allowed = 1;
+            cpu->PC = desempilharContexto(pilhaContexto) + 1; // Restaura PC do programa principal
+        }
+
         if(emInterrupcao){
             inst = cpu->tratar[cpu->PC]; 
         }else {
@@ -95,11 +109,6 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3,Con
         }
         
         cpu->opcode = inst.opcode;
-
-        if (cpu->opcode == -1 && !emInterrupcao) {
-            printf("Programa principal terminou!\n");
-            break;
-        }
 
         if (cpu->opcode != -1) {
             cpu->registrador1 = MMU_buscarNasMemorias(inst.add1, ram, cpu->L1, cpu->L2, cpu->L3);
@@ -170,13 +179,7 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3,Con
                     break;
             }
 
-            // Tratamento do fim da interrupção
-            if (emInterrupcao && cpu->opcode == -1) {
-                printf("\nFIM - TRATADOR DE INTERRUPCAO\n");
-                emInterrupcao = 0;
-                allowed = 1;
-                cpu->PC = desempilharContexto(pilhaContexto) + 1; // Restaura PC do programa principal
-            }
+            
 
             cpu->PC++;
 
