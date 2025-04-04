@@ -99,11 +99,11 @@ BlocoMemoria* MMU_buscarNasMemorias(Endereco *e, RAM* ram, Cache* L1, Cache* L2,
 
     // Se não encontrou em nenhuma cache, busca na RAM e move para a Cache L3
     custo = 111110;
-    BlocoMemoria* bloco = MMU_movHDParaRAM(e->endBloco, ram);
+    BlocoMemoria* bloco = MMU_movHDParaRAM(e->endBloco, ram, custo);
     
     // Agora move para L3
     bloco = MMU_movRamCache3(posicaoCache3, L3, ram, e, custo);
-    
+    bloco->cacheHit = 5;
     for (int i = 0; i < 2; i++) {
         if (L3->memorySet[posicaoCache3].lines[i].endBloco == e->endBloco) {
             MMU_movCache3Cache2(posicaoCache2, posicaoCache3, L2, L3, custo, i);
@@ -210,7 +210,7 @@ BlocoMemoria* MMU_movRamCache3(int posicaoCache3, Cache* L3, RAM* ram, Endereco 
     return &L3->memorySet[posicaoCache3].lines[lruIndex];
 }
 
-BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram) {
+BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram, int custo) {
     int buffer[4]; // Buffer para armazenar as 4 palavras do HD
     if (!HD_getDado(endBloco, buffer)) { // Usar a nova HD_getDado
         printf("Erro ao ler do HD!\n");
@@ -252,6 +252,7 @@ BlocoMemoria* MMU_movHDParaRAM(int endBloco, RAM* ram) {
     ram->memoria[ram_index].valido = 1;
     ram->memoria[ram_index].atualizado = 0;
     ram->memoria[ram_index].cacheHit = 5;
+    ram->memoria[ram_index].custo = custo;
     ram->memoria[ram_index].ultimoAcesso = contadorLRU++;
     for (int i = 0; i < 4; i++) {
         ram->memoria[ram_index].palavras[i] = buffer[i]; // Copia as palavras

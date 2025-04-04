@@ -194,16 +194,17 @@ void CPU_iniciar(CPU* cpu,RAM* ram, int lengthL1, int lenghtL2, int lengthL3,Con
     printf("\t| CACHE HIT CACHE L1: %d\t| CACHE MISS CACHE L1: %d \t|\n", cpu->hitC1, cpu->missC1);
     printf("\t| CACHE HIT CACHE L2: %d\t| CACHE MISS CACHE L2: %d \t|\n", cpu->hitC2, cpu->missC2);
     printf("\t| CACHE HIT CACHE L3: %d\t| CACHE MISS CACHE L3: %d \t|\n", cpu->hitC3, cpu->missC3);
+    printf("\t| CACHE HIT CACHE RAM: %d\t| CACHE MISS CACHE RAM: %d \t|\n", cpu->hitRAM, cpu->missRAM);
     printf("\t+---------------------------------------------------------------+\n");
 
     // Imprimindo a CACHE HIT RAM com borda
     printf("\n\t+-----------------------+\n");
-    printf("\t| CACHE HIT RAM: %d\t|\n", cpu->hitRAM);
+    printf("\t| CACHE HIT HD: %d\t|\n", cpu->hitHD);
     printf("\t+-----------------------+\n");
 
     // Imprimindo o custo total, hit total e miss total com borda
-    int totalHit = cpu->hitC1 + cpu->hitC2 + cpu->hitC3;
-    int totalMiss = cpu->missC1 + cpu->missC2 + cpu->missC3;
+    int totalHit = cpu->hitC1 + cpu->hitC2 + cpu->hitC3 + cpu->hitRAM;
+    int totalMiss = cpu->missC1 + cpu->missC2 + cpu->missC3 + cpu->missRAM;
     printf("\n\t+-----------------------------------------------------------------------+\n");
     printf("\t| Custo total: %d\t| Hit total: %d\t| Miss total: %d \t|\n", cpu->custo, totalHit, totalMiss);
     printf("\t+-----------------------------------------------------------------------+\n\n");

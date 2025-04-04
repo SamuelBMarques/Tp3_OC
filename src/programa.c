@@ -20,7 +20,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
     char linha[256];
     int index = 0;
     while (fgets(linha, sizeof(linha), file) && index < 10000) {
-        Instrucao* umaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
+        Instrucao umaInstrucao;
         char* palavras[7];
         char* token = strtok(linha, ":");
         int i = 0;
@@ -29,32 +29,33 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
             token = strtok(NULL, ":");
         }
 
-        umaInstrucao->opcode = atoi(palavras[0]);
+        umaInstrucao.opcode = atoi(palavras[0]);
 
         Endereco* e1 = (Endereco*)malloc(sizeof(Endereco));
         e1->endBloco = atoi(palavras[1]);
         e1->endPalavra = atoi(palavras[2]) % 4;
-        umaInstrucao->add1 = e1;
+        umaInstrucao.add1 = e1;
 
         Endereco* e2 = (Endereco*)malloc(sizeof(Endereco));
         e2->endBloco = atoi(palavras[3]);
         e2->endPalavra = atoi(palavras[4]) % 4;
-        umaInstrucao->add2 = e2;
+        umaInstrucao.add2 = e2;
 
         Endereco* e3 = (Endereco*)malloc(sizeof(Endereco));
         e3->endBloco = atoi(palavras[5]);
         e3->endPalavra = atoi(palavras[6]) % 4;
-        umaInstrucao->add3 = e3;
+        umaInstrucao.add3 = e3;
 
-        trecho1[index++] = *umaInstrucao;
-        free(umaInstrucao);
+        trecho1[index++] = umaInstrucao;
     }
     fclose(file);
 
     // Add halt instruction
-    Instrucao* umaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
-    umaInstrucao->opcode = -1;
-    trecho1[10000] = *umaInstrucao;
+    Instrucao umaInstrucao;
+    umaInstrucao.opcode = -1;
+    trecho1[10000] = umaInstrucao;
+    
+
 
     Instrucao* tratamentoINT = (Instrucao*)malloc(101 * sizeof(Instrucao));
     FILE* fileINT = fopen("interrupcao.txt", "r");
@@ -64,7 +65,7 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
     }
     index = 0;
     while (fgets(linha, sizeof(linha), fileINT)) {
-        Instrucao* umaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
+        Instrucao umaInstrucao;
         char* palavras[7];
         char* token = strtok(linha, ":");
         int i = 0;
@@ -74,46 +75,46 @@ void programaAleatorioRepeticoes(RAM* ram, CPU* cpu, Contexto** pilhaContexto) {
             token = strtok(NULL, ":");
         }
 
-        umaInstrucao->opcode = atoi(palavras[0]);
+        umaInstrucao.opcode = atoi(palavras[0]);
 
         Endereco* e1 = (Endereco*)malloc(sizeof(Endereco));
         e1->endBloco = atoi(palavras[1]);
         e1->endPalavra = atoi(palavras[2]) % 4;
-        umaInstrucao->add1 = e1;
+        umaInstrucao.add1 = e1;
 
         Endereco* e2 = (Endereco*)malloc(sizeof(Endereco));
         e2->endBloco = atoi(palavras[3]);
         e2->endPalavra = atoi(palavras[4]) % 4;
-        umaInstrucao->add2 = e2;
+        umaInstrucao.add2 = e2;
 
         Endereco* e3 = (Endereco*)malloc(sizeof(Endereco));
         e3->endBloco = atoi(palavras[5]);
         e3->endPalavra = atoi(palavras[6]) % 4;
-        umaInstrucao->add3 = e3;
+        umaInstrucao.add3 = e3;
 
-        tratamentoINT[index++] = *umaInstrucao;
-        free(umaInstrucao);
+        tratamentoINT[index++] = umaInstrucao;
     }
     fclose(fileINT);
 
     // Add halt instruction
-    Instrucao* ultimaInstrucao = (Instrucao*)malloc(sizeof(Instrucao));
-    ultimaInstrucao->opcode = -1;
-    tratamentoINT[100] = *ultimaInstrucao;
+    Instrucao ultimaInstrucao;
+    ultimaInstrucao.opcode = -1;
+    tratamentoINT[100] = ultimaInstrucao;
 
 
     criarRAM_vazia(ram, 1000);
     CPU_setTratar(cpu,tratamentoINT);
     CPU_setPrograma(cpu, trecho1);
     CPU_iniciar(cpu, ram, 16, 32, 64, pilhaContexto);
-    for (int i = 0; i <= 10000; i++) {
+
+    for (int i = 0; i < 10000; i++) {
         free(trecho1[i].add1);
         free(trecho1[i].add2);
         free(trecho1[i].add3);
     }
     free(trecho1);
     
-    for (int i = 0; i <= 100; i++) {
+    for (int i = 0; i < 100; i++) {
         free(tratamentoINT[i].add1);
         free(tratamentoINT[i].add2);
         free(tratamentoINT[i].add3);
@@ -169,5 +170,6 @@ int main() {
     programaAleatorioRepeticoes(ram, cpu,&pilhaContexto);
     free(ram);
     free(cpu);
+    //free(pilhaContexto);
     return 0;
 }

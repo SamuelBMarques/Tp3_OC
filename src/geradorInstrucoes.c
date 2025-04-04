@@ -7,7 +7,7 @@
 #define QTD_INS2 100
 #define TAM_FOR 3
 #define TAM_MEM 1000
-#define PROB_FOR 95
+#define PROB_FOR 80
 
 void GeradorInstrucoesINT() {
     int aleatorio;
